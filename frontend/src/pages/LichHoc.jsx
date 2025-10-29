@@ -1,62 +1,89 @@
-// src/pages/DashboardSchedule.jsx
-import React from 'react';
-import { RiCalendarLine, RiTimeLine, RiMapPinLine } from 'react-icons/ri';
+// src/pages/LichHoc.jsx
+import React, { useState, useEffect } from 'react';
+import { RiCalendarLine, RiMapPinLine, RiTimeLine, RiLoader4Line, RiAlertLine } from 'react-icons/ri';
+import { fetchSchedule } from '../services/api';
 
-const ScheduleItem = ({ title, type, date, time, location, color }) => (
-  <div className={`border ${color.border} rounded-lg p-4`}>
-    <div className="flex items-start justify-between mb-2">
-      <h4 className="font-semibold text-gray-900 text-sm">{title}</h4>
-      <span className={`${color.bg} ${color.text} text-xs px-2 py-1 rounded whitespace-nowrap`}>
-        {type}
-      </span>
-    </div>
-    <div className="space-y-1 text-xs text-gray-600">
-      <div className="flex items-center"><RiCalendarLine className="mr-2" /> {date}</div>
-      <div className="flex items-center"><RiTimeLine className="mr-2" /> {time}</div>
-      <div className="flex items-center"><RiMapPinLine className="mr-2" /> {location}</div>
-    </div>
-  </div>
-);
+const ScheduleItem = ({ item }) => {
+    const dayColorMap = {
+        'Thứ 2': 'bg-blue-100 text-blue-700',
+        'Thứ 3': 'bg-green-100 text-green-700',
+        'Thứ 4': 'bg-yellow-100 text-yellow-700',
+        'Thứ 5': 'bg-orange-100 text-orange-700',
+        'Thứ 6': 'bg-indigo-100 text-indigo-700',
+        'Thứ 7': 'bg-purple-100 text-purple-700',
+        'Chủ nhật': 'bg-red-100 text-red-700',
+    };
+    const color = dayColorMap[item.dayOfWeek] || 'bg-gray-100 text-gray-700';
 
-function DashboardSchedule() {
-  const colors = {
-    blue: { border: 'border-blue-200', bg: 'bg-blue-100', text: 'text-blue-700' },
-    red: { border: 'border-red-200', bg: 'bg-red-100', text: 'text-red-700' },
-  };
+    return (
+        <div className={`p-6 rounded-2xl shadow-sm ${color} bg-opacity-60`}>
+            <div className="flex items-center justify-between mb-3">
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${color}`}>{item.dayOfWeek}</span>
+                <span className="text-sm font-medium text-gray-700">{item.type || 'Lịch học'}</span>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-3">{item.courseName}</h3>
+            <div className="space-y-2 text-sm">
+                <p className="flex items-center text-gray-700"><RiTimeLine className="mr-2" /> {item.startTime} - {item.endTime}</p>
+                <p className="flex items-center text-gray-700"><RiMapPinLine className="mr-2" /> Phòng {item.room}</p>
+            </div>
+        </div>
+    );
+};
+
+function LichHoc() {
+  const [schedule, setSchedule] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadSchedule = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await fetchSchedule();
+        setSchedule(response.data);
+      } catch (err) {
+        console.error("Lỗi khi lấy lịch học:", err);
+        setError('Không thể tải lịch học. Vui lòng thử lại.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSchedule();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-40">
+        <RiLoader4Line className="animate-spin text-4xl text-blue-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600 bg-red-100 p-4 rounded-lg flex items-center justify-center">
+         <RiAlertLine className="mr-2" /> {error}
+      </div>
+    );
+  }
+
+  if (schedule.length === 0) {
+      return (
+           <div className="text-center text-gray-500 bg-white p-6 rounded-2xl shadow-sm">
+               <RiCalendarLine className="text-4xl mx-auto mb-4" />
+               <p>Bạn chưa có lịch học nào.</p>
+           </div>
+      );
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="space-y-4">
-        <h3 className="font-bold text-gray-900 text-xl">Thứ 2</h3>
-        <ScheduleItem
-          title="Cơ Sở Dữ Liệu"
-          type="Lý thuyết"
-          date="01/02/2024"
-          time="13:00 - 15:00"
-          location="B205"
-          color={colors.blue}
-        />
-        <ScheduleItem
-          title="Trí Tuệ Nhân Tạo"
-          type="Thực hành"
-          date="02/02/2024"
-          time="09:00 - 11:00"
-          location="C301"
-          color={colors.red}
-        />
-      </div>
-      <div className="space-y-4">
-        <h3 className="font-bold text-gray-900 text-xl">Thứ 3</h3>
-        {/* Thêm lịch thứ 3 ở đây */}
-      </div>
-      <div className="bg-white rounded-2xl shadow-sm p-6 lg:col-start-3">
-        <h3 className="font-bold text-gray-900 mb-4">Chú Thích</h3>
-        <div className="space-y-2">
-          <div className="flex items-center space-x-3"><div className="w-4 h-4 bg-blue-500 rounded"></div><span className="text-sm text-gray-600">Lý thuyết</span></div>
-          <div className="flex items-center space-x-3"><div className="w-4 h-4 bg-red-500 rounded"></div><span className="text-sm text-gray-600">Thực hành</span></div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {schedule.map(item => (
+        <ScheduleItem key={item._id} item={item} />
+      ))}
     </div>
   );
 }
-export default DashboardSchedule;
+
+export default LichHoc;

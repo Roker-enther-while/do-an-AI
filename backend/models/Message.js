@@ -2,11 +2,10 @@
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({
-  username: { type: String, required: true },
-  messageFrom: { type: String, required: true, enum: ['user', 'bot'] },
+  username: { type: String, required: true, index: true },
+  messageFrom: { type: String, enum: ['user', 'bot'], required: true },
   content: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now, index: true }
 });
-MessageSchema.index({ username: 1, timestamp: 1 });
 
-module.exports = mongoose.model('Message', MessageSchema);
+module.exports = mongoose.model('Message', MessageSchema, 'messages');

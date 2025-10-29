@@ -2,18 +2,17 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true }, // Nên dùng studentId làm username
-  passwordHash: { type: String, required: true },
-  fullName: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  role: { type: String, default: 'student' }, // student, admin,...
-  dateOfBirth: { type: Date }, // Thêm cho Kích hoạt tài khoản
-  idCardNumber: { type: String }, // Thêm cho Kích hoạt tài khoản
+  username: { type: String, required: true, unique: true, trim: true },
+  passwordHash: { type: String, required: true }, // Stores plain text password (INSECURE)
+  fullName: { type: String, trim: true },
+  email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+  role: { type: String, enum: ['student', 'admin'], default: 'student' },
+  isActivated: { type: Boolean, default: false },
+  idCardNumber: { type: String },
+  dateOfBirth: { type: Date },
   phone: { type: String },
   address: { type: String },
-  isActivated: { type: Boolean, default: false }, // Trạng thái kích hoạt
-  // Có thể thêm các field khác: registeredCourses, gpa,...
   createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', UserSchema, 'users');

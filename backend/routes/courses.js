@@ -2,123 +2,92 @@
 const express = require('express');
 const router = express.Router();
 const Course = require('../models/Course');
-const User = require('../models/User');
-const Schedule = require('../models/Schedule'); // Cần để kiểm tra trùng lịch
-const authMiddleware = require('../middleware/authMiddleware'); // Import middleware
+const Schedule = require('../models/Schedule');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// GET /api/courses - Public
-router.get('/', async (req, res) => { /* ... giữ nguyên logic lấy danh sách ... */
+// GET /api/courses (Public)
+router.get('/', async (req, res) => { /* ... code unchanged ... */
     try {
-        const courses = await Course.find();
-        // Có thể populate thông tin giảng viên nếu cần
-        // const courses = await Course.find().populate('teacher', 'name teacherId');
+        const courses = await Course.find().sort('courseCode');
         res.json(courses);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("Error fetching courses:", err.message);
+        res.status(500).json({ message: 'Server Error' });
     }
 });
 
-// GET /api/courses/:courseCode - Public
-router.get('/:courseCode', async (req, res) => { /* ... giữ nguyên logic lấy chi tiết ... */
+// GET /api/courses/:courseCode (Public)
+router.get('/:courseCode', async (req, res) => { /* ... code unchanged ... */
     try {
         const course = await Course.findOne({ courseCode: req.params.courseCode });
-        // .populate('teacher');
-        if (!course) {
-            return res.status(404).json({ msg: 'Môn học không tồn tại' });
-        }
-        // TODO: Lấy thêm thông tin tài liệu tham khảo,...
+        if (!course) return res.status(404).json({ message: 'Course not found' });
         res.json(course);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("Error fetching course details:", err.message);
+        res.status(500).json({ message: 'Server Error' });
     }
 });
 
-// POST /api/courses/register/:courseCode - Protected
-router.post('/register/:courseCode', authMiddleware, async (req, res) => {
-  const username = req.user.username; // Lấy từ token
-  const courseCode = req.params.courseCode;
-
-  try {
-    const course = await Course.findOne({ courseCode: courseCode });
-    // const user = await User.findOne({ username: username }); // Lấy user nếu cần kiểm tra thêm
-
-    if (!course /*|| !user*/) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy môn học hoặc người dùng.' });
-    }
-
-    // 1. Ràng buộc: Đã đăng ký chưa?
-    if (course.registeredStudents.includes(username)) {
-      return res.status(400).json({ success: false, message: 'Bạn đã đăng ký môn học này rồi.' });
-    }
-
-    // 2. Ràng buộc: Còn chỗ không?
-    if (course.registeredStudents.length >= course.maxStudents) {
-      return res.status(400).json({ success: false, message: 'Môn học đã hết chỗ.' });
-    }
-
-    // 3. Ràng buộc: Kiểm tra môn tiên quyết (Giả sử CourseSchema có prerequisites)
-    // if (course.prerequisites && course.prerequisites.length > 0) {
-    //   const completedCourses = user.completedCourses || []; // Giả sử user có trường này
-    //   const hasPrerequisites = course.prerequisites.every(code => completedCourses.includes(code));
-    //   if (!hasPrerequisites) {
-    //     return res.status(400).json({ success: false, message: 'Bạn chưa hoàn thành các môn tiên quyết.' });
-    //   }
-    // }
-
-    // 4. Ràng buộc: Kiểm tra trùng lịch (Logic phức tạp hơn)
-    // const courseSchedule = await getCourseSchedule(courseCode); // Hàm lấy lịch chi tiết của môn
-    // const userSchedule = await Schedule.find({ studentUsername: username });
-    // const hasConflict = checkScheduleConflict(courseSchedule, userSchedule); // Hàm kiểm tra trùng
-    // if (hasConflict) {
-    //     return res.status(400).json({ success: false, message: 'Lịch học bị trùng với môn đã đăng ký.' });
-    // }
-
-
-    // --- Nếu mọi ràng buộc OK ---
-    course.registeredStudents.push(username);
-    // user.registeredCourses.push(courseCode); // Cập nhật user nếu cần
-
-    await course.save();
-    // await user.save();
-
-    // TODO: Tự động thêm lịch học chi tiết vào Schedule collection cho user này
-
-    res.json({ success: true, message: `Đăng ký môn ${courseCode} thành công!` });
-
-  } catch (err) {
-    console.error("Registration error:", err.message);
-    res.status(500).json({ success: false, message: 'Lỗi server khi đăng ký môn học.' });
-  }
-});
-
-// DELETE /api/courses/unregister/:courseCode - Protected
-router.delete('/unregister/:courseCode', authMiddleware, async (req, res) => {
+// POST /api/courses/register/:courseCode (Protected)
+router.post('/register/:courseCode', authMiddleware, async (req, res) => { /* ... code unchanged ... */
     const username = req.user.username;
     const courseCode = req.params.courseCode;
-     try {
+    try {
         const course = await Course.findOne({ courseCode: courseCode });
         if (!course) return res.status(404).json({ success: false, message: 'Môn học không tồn tại.' });
+        if (course.registeredStudents.length >= course.maxStudents) return res.status(400).json({ success: false, message: 'Môn học đã hết chỗ.' });
+        if (course.registeredStudents.includes(username)) return res.status(400).json({ success: false, message: 'Bạn đã đăng ký môn học này rồi.' });
 
-        // Kiểm tra xem user có đăng ký môn này không
-        if (!course.registeredStudents.includes(username)) {
-             return res.status(400).json({ success: false, message: 'Bạn chưa đăng ký môn học này.' });
+        const userSchedules = await Schedule.find({ studentUsername: username });
+        const courseScheduleDetails = course.schedule;
+        for (const newSession of courseScheduleDetails) {
+            for (const existingSession of userSchedules) {
+                if (newSession.dayOfWeek === existingSession.dayOfWeek) {
+                    const newStart = parseInt(newSession.startTime.split(':')[0]) * 60 + parseInt(newSession.startTime.split(':')[1]);
+                    const newEnd = parseInt(newSession.endTime.split(':')[0]) * 60 + parseInt(newSession.endTime.split(':')[1]);
+                    const existingStart = parseInt(existingSession.startTime.split(':')[0]) * 60 + parseInt(existingSession.startTime.split(':')[1]);
+                    const existingEnd = parseInt(existingSession.endTime.split(':')[0]) * 60 + parseInt(existingSession.endTime.split(':')[1]);
+                    if (newStart < existingEnd && newEnd > existingStart) {
+                        console.log(`Schedule conflict: ${courseCode} (${newSession.dayOfWeek} ${newSession.startTime}-${newSession.endTime}) with ${existingSession.courseCode}`);
+                        return res.status(400).json({ success: false, message: `Bị trùng lịch với môn ${existingSession.courseCode} (${existingSession.dayOfWeek}, ${existingSession.startTime} - ${existingSession.endTime}).` });
+                    }
+                }
+            }
         }
 
-        // Xóa user khỏi danh sách đăng ký
-        course.registeredStudents = course.registeredStudents.filter(studentId => studentId !== username);
+        course.registeredStudents.push(username);
         await course.save();
 
-        // TODO: Xóa môn học khỏi danh sách của user (nếu có)
-        // TODO: Xóa các lịch học liên quan trong Schedule collection
+        const scheduleDocsToAdd = course.schedule.map(session => ({
+            studentUsername: username, courseCode: course.courseCode, courseName: course.courseName,
+            dayOfWeek: session.dayOfWeek, startTime: session.startTime, endTime: session.endTime,
+            room: session.room, teacherId: course.teacherId
+        }));
+        if (scheduleDocsToAdd.length > 0) { await Schedule.insertMany(scheduleDocsToAdd); }
 
-        res.json({ success: true, message: `Hủy đăng ký môn ${courseCode} thành công.` });
+        res.json({ success: true, message: `Đăng ký môn học ${courseCode} thành công!` });
     } catch (err) {
-        console.error("Unregistration error:", err.message);
+        console.error(`Error registering course ${courseCode} for ${username}:`, err.message);
+        res.status(500).json({ success: false, message: 'Lỗi server khi đăng ký môn học.' });
+    }
+});
+
+// DELETE /api/courses/unregister/:courseCode (Protected)
+router.delete('/unregister/:courseCode', authMiddleware, async (req, res) => { /* ... code unchanged ... */
+    const username = req.user.username;
+    const courseCode = req.params.courseCode;
+    try {
+        const courseUpdateResult = await Course.updateOne({ courseCode: courseCode }, { $pull: { registeredStudents: username } });
+        const deletedSchedules = await Schedule.deleteMany({ studentUsername: username, courseCode: courseCode });
+        if (courseUpdateResult.modifiedCount > 0 || deletedSchedules.deletedCount > 0) {
+            res.json({ success: true, message: `Đã hủy đăng ký môn học ${courseCode}.` });
+        } else {
+             return res.status(400).json({ success: false, message: 'Bạn chưa đăng ký môn học này hoặc môn học không tồn tại.' });
+        }
+    } catch (err) {
+        console.error(`Error unregistering course ${courseCode} for ${username}:`, err.message);
         res.status(500).json({ success: false, message: 'Lỗi server khi hủy đăng ký.' });
     }
 });
-
 
 module.exports = router;
