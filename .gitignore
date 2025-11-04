@@ -1,0 +1,13 @@
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# Environment files
+.env
+backend/.env
+frontend/.env
+
+# OS
+.DS_Store
+Thumbs.db
